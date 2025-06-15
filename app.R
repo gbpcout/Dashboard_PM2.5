@@ -8,6 +8,7 @@ library(tmap)
 library(lubridate)
 library(BlandAltmanLeh)
 library(irr)
+library(tseries)
 
 # Carregamento e preparação de dados
 
@@ -15,7 +16,44 @@ library(irr)
 
 # ===== Carregamento dos dados =====
 
-rs = read_csv(file = "rs_pm25.csv")
+rs = read_csv(file = "https://github.com/gbpcout/Dashboard_PM2.5/raw/refs/heads/main/rs_pm25.csv")
+rs.donkelar = read_csv(file = "https://github.com/gbpcout/Dashboard_PM2.5/raw/refs/heads/main/rs.donkelar.csv" )
+
+
+
+
+# Nome base
+nome_base <- "RS_Municipios_2024"
+
+# Extensões do shapefile
+extensoes <- c("shp", "dbf", "shx", "prj", "cpg")
+
+# Loop para baixar
+for (ext in extensoes) {
+  url <- paste0("https://github.com/gbpcout/Dashboard_PM2.5/raw/main/", nome_base, ".", ext)
+  dest <- paste0(nome_base, ".", ext)
+  download.file(url, dest, mode = "wb")
+}
+
+# Agora pode ler o shapefile normalmente
+mapa_rs <- st_read(paste0(nome_base, ".shp"))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 rsmes <- rs %>%
   group_by(Cod, mes) %>%
@@ -29,8 +67,7 @@ rsUF <- rsmes %>%
   group_by(mes) %>%
   summarise(pm2.5 = mean(pm2.5, na.rm = TRUE), .groups = "drop")
 
-rs.donkelar <- read_excel("dados_completos_consolidado_donkelar.xlsx") %>%
-  filter(SIGLA_UF == 43)
+
 
 rs.donk.reduzido <- rs.donkelar %>%
   select(Mes, Media_PM25) %>%
@@ -69,7 +106,7 @@ ui <- dashboardPage(
       menuItem("Boxplot", tabName = "boxplot", icon = icon("box")),
       menuItem("Série Temporal", tabName = "serie", icon = icon("chart-line")),
       menuItem("Dispersão", tabName = "dispersao", icon = icon("braille")),
-      menuItem("Bland-Altman", tabName = "bland", icon = icon("chart-scatter")),
+      menuItem("Bland-Altman", tabName = "bland", icon = icon("braille")),
       menuItem("Mapa CAMS", tabName = "mapcams", icon = icon("map")),
       menuItem("Mapa Donkelar", tabName = "mapdonk", icon = icon("map")),
       menuItem("Estatísticas", tabName = "estat", icon = icon("calculator")),
@@ -90,9 +127,13 @@ ui <- dashboardPage(
       tabItem(tabName = "serie",
               plotOutput("serie"),
               br(),
-              tags$p(em(" - A faixa de confiança é da média da diferença entre os métodos (CAMS e Von Donkelar)."),
-                     style = "color: black; font-size: 20px;")
+              shiny::tags$p(
+                shiny::em(" - A faixa de confiança é da média da diferença entre os métodos (CAMS e Von Donkelar)."),
+                style = "color: black; font-size: 20px;"
+              )
+              
       ),
+      
       
       tabItem(tabName = "dispersao", plotOutput("dispersao")),
       
@@ -245,7 +286,8 @@ server <- function(input, output) {
     tmap_mode("view")
     
     # Carrega o shapefile e junta com os dados
-    map <- read_sf("RS_Municipios_2024.shp")
+    #map <- read_sf("RS_Municipios_2024.shp")
+    map = mapa_rs
     rsano$Cod <- as.character(rsano$Cod)
     map <- left_join(map, rsano, by = c("CD_MUN" = "Cod"))
     
@@ -277,8 +319,8 @@ server <- function(input, output) {
   
   output$mapdonk <- renderTmap({
     tmap_mode("view")
-    map <- read_sf("RS_Municipios_2024.shp")
-    
+    #map <- read_sf("RS_Municipios_2024.shp")
+    map = mapa_rs
     # Corrigir tipo de dado
     rs.donkelar$CD_MUN <- as.character(rs.donkelar$CD_MUN)
     
